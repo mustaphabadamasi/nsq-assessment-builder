@@ -6,8 +6,9 @@
 <title>NSQ Assessment Builder · NBTE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://checkout.flutterwave.com/v3.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if(typeof pdfjsLib!=='undefined') pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <style>
 :root{
   --green:#1a5c2a;--green-mid:#2d7a40;--green-light:#e8f5eb;
@@ -33,8 +34,7 @@ body{font-family:var(--font-body);background:var(--mist);color:var(--ink);min-he
 .nav-btn:hover{background:rgba(255,255,255,.25)}
 
 /* ── SCREENS ── */
-.screen{display:none;min-height:calc(100vh - 64px)}
-.screen.active{display:block}
+.screen{min-height:calc(100vh - 64px)}
 
 /* ── AUTH SCREEN ── */
 #screen-auth{display:flex;min-height:calc(100vh - 64px)}
@@ -245,121 +245,13 @@ p.body-text{margin-bottom:10px;font-size:13px;line-height:1.7}
     </div>
   </div>
   <div class="nav-right">
-    <span class="nav-badge">QAA EDITION</span>
-    <span class="nav-user" id="nav-user-name" style="display:none"></span>
-    <button class="nav-btn" id="nav-logout-btn" style="display:none" onclick="logout()">Sign out</button>
+    <span class="nav-badge">CENTRE EDITION</span>
+    
   </div>
 </nav>
 
-<!-- ══════════════ SCREEN: AUTH ══════════════ -->
-<div id="screen-auth" class="screen active">
-  <div class="auth-hero">
-    <span class="hero-tag">NSQ / NBTE CERTIFIED TOOL</span>
-    <h2 class="hero-h">Build complete NSQ evidence,<br/><em>straight from your NOS.</em></h2>
-    <p class="hero-p">Paste any National Occupational Standard, enter candidate details, and generate a full NBTE-compliant assessment pack — ready to print or export to Word.</p>
-    <ul class="feat-list">
-      <li>Plan, Review &amp; Feedback Record (ARF 02A)</li>
-      <li>Direct Observation Report with narrative</li>
-      <li>Personal Reflective Statement</li>
-      <li>Witness Testimony &amp; Q&amp;A Record</li>
-      <li>Learner Workbook &amp; Evidence Matrix</li>
-      <li>Qualification Cover &amp; Competence Declaration</li>
-    </ul>
-    <div class="plans-row">
-      <div class="plan-chip"><div class="amt">₦3,500</div><div class="lbl">/ month</div></div>
-      <div class="plan-chip"><div class="amt">₦9,000</div><div class="lbl">/ quarter</div></div>
-      <div class="plan-chip"><div class="amt">₦28,000</div><div class="lbl">/ year</div></div>
-    </div>
-  </div>
-  <div class="auth-form-wrap">
-    <div class="auth-tabs">
-      <div class="auth-tab active" onclick="switchTab('login')">Sign In</div>
-      <div class="auth-tab" onclick="switchTab('signup')">Create Account</div>
-    </div>
-
-    <!-- LOGIN -->
-    <div id="form-login">
-      <div class="form-group"><label>Email address</label><input type="email" id="login-email" placeholder="you@email.com"/></div>
-      <div class="form-group"><label>Password</label><input type="password" id="login-password" placeholder="••••••••"/></div>
-      <button class="btn-primary" onclick="doLogin()">Sign In →</button>
-      <div class="auth-msg" id="login-msg"></div>
-      <div class="divider" style="margin-top:20px">or</div>
-      <p style="text-align:center;font-size:13px;color:#666;margin-top:12px">Don't have an account? <a href="#" onclick="switchTab('signup');return false;" style="color:var(--green);font-weight:600">Subscribe now</a></p>
-    </div>
-
-    <!-- SIGNUP -->
-    <div id="form-signup" style="display:none">
-      <div class="form-group"><label>Full name</label><input type="text" id="signup-name" placeholder="e.g. Mustafa Badamasi"/></div>
-      <div class="form-group"><label>Email address</label><input type="email" id="signup-email" placeholder="you@email.com"/></div>
-      <div class="form-group"><label>Password (min 8 chars)</label><input type="password" id="signup-password" placeholder="••••••••"/></div>
-      <div class="form-group"><label>Organisation / Centre</label><input type="text" id="signup-org" placeholder="e.g. ABC Skills Centre"/></div>
-      <button class="btn-primary" onclick="doSignup()">Create Account →</button>
-      <div class="auth-msg" id="signup-msg"></div>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════ SCREEN: SUBSCRIPTION ══════════════ -->
-<div id="screen-sub" class="screen">
-  <div class="sub-header">
-    <h2>Choose Your Plan</h2>
-    <p>One subscription · one login · unlimited document generation</p>
-  </div>
-  <div class="plans-grid">
-    <div class="plan-card" onclick="startPayment('monthly')">
-      <div class="plan-name">Monthly</div>
-      <div class="plan-price"><sup>₦</sup>3,500</div>
-      <div class="plan-period">per month · billed monthly</div>
-      <ul class="plan-features">
-        <li>All 9 document types</li>
-        <li>Unlimited NOS units</li>
-        <li>Print &amp; Word export</li>
-        <li>Cancel any time</li>
-      </ul>
-      <button class="btn-plan">Subscribe Monthly</button>
-    </div>
-    <div class="plan-card popular" onclick="startPayment('quarterly')">
-      <div class="popular-badge">⭐ MOST POPULAR</div>
-      <div class="plan-name">Quarterly</div>
-      <div class="plan-price"><sup>₦</sup>9,000</div>
-      <div class="plan-period">per quarter · save ₦1,500</div>
-      <ul class="plan-features">
-        <li>All 9 document types</li>
-        <li>Unlimited NOS units</li>
-        <li>Print &amp; Word export</li>
-        <li>Priority support</li>
-      </ul>
-      <button class="btn-plan">Subscribe Quarterly</button>
-    </div>
-    <div class="plan-card" onclick="startPayment('annual')">
-      <div class="plan-name">Annual</div>
-      <div class="plan-price"><sup>₦</sup>28,000</div>
-      <div class="plan-period">per year · save ₦14,000</div>
-      <ul class="plan-features">
-        <li>All 9 document types</li>
-        <li>Unlimited NOS units</li>
-        <li>Print &amp; Word export</li>
-        <li>Priority support</li>
-      </ul>
-      <button class="btn-plan">Subscribe Annually</button>
-    </div>
-  </div>
-  <p class="sub-note">Payments processed securely via Flutterwave. Accepts Nigerian cards, bank transfer, USSD &amp; mobile money across Africa.</p>
-</div>
-
-<!-- ══════════════ SCREEN: EXPIRED ══════════════ -->
-<div id="screen-expired" class="screen">
-  <div class="expired-box">
-    <div class="expired-icon">⏰</div>
-    <h2>Subscription Expired</h2>
-    <div class="days-left" id="expired-msg">Your subscription has ended</div>
-    <p>Renew your subscription to continue generating NSQ assessment documents. All your settings are saved.</p>
-    <button class="btn-primary" onclick="showScreen('sub')">Renew Subscription</button>
-  </div>
-</div>
-
 <!-- ══════════════ SCREEN: APP ══════════════ -->
-<div id="screen-app" class="screen">
+<div id="screen-app">
 <div style="background:linear-gradient(135deg,var(--green) 0%,var(--green-mid) 100%);color:#fff;padding:40px 32px;">
   <h1 style="font-family:var(--font-head);font-size:clamp(24px,3vw,40px);line-height:1.15;margin-bottom:8px">Build complete NSQ evidence, <em style="color:var(--gold)">straight from your NOS.</em></h1>
   <p style="opacity:.85;font-size:15px;max-width:600px">Paste any National Occupational Standard, enter candidate details, and generate a full NBTE assessment pack in official format.</p>
@@ -376,7 +268,7 @@ p.body-text{margin-bottom:10px;font-size:13px;line-height:1.7}
     <!-- Mode toggle -->
     <div style="display:flex;gap:0;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;width:fit-content">
       <button id="mode-paste-btn" onclick="setMode('paste')" style="padding:8px 20px;font-size:13px;font-weight:600;font-family:var(--font-body);border:none;cursor:pointer;background:var(--green);color:#fff;transition:.2s">✏️ Paste Text</button>
-      <button id="mode-upload-btn" onclick="setMode('upload')" style="padding:8px 20px;font-size:13px;font-weight:600;font-family:var(--font-body);border:none;cursor:pointer;background:#fff;color:#555;transition:.2s">📎 Upload File (.txt)</button>
+      <button id="mode-upload-btn" onclick="setMode('upload')" style="padding:8px 20px;font-size:13px;font-weight:600;font-family:var(--font-body);border:none;cursor:pointer;background:#fff;color:#555;transition:.2s">📎 Upload File (PDF / Word)</button>
     </div>
 
     <!-- Paste mode -->
@@ -388,11 +280,11 @@ p.body-text{margin-bottom:10px;font-size:13px;line-height:1.7}
     <div id="mode-upload" style="display:none">
       <div id="drop-zone" style="border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:.2s;background:#fafafa" onclick="document.getElementById('file-input').click()" ondragover="event.preventDefault();this.style.borderColor='var(--green)'" ondragleave="this.style.borderColor='var(--border)'" ondrop="handleDrop(event)">
         <div style="font-size:32px;margin-bottom:8px">📄</div>
-        <div style="font-size:14px;font-weight:600;color:var(--ink)">Drop your NOS .txt file here</div>
-        <div style="font-size:12px;color:#888;margin-top:4px">or click to browse — supports plain text files</div>
+        <div style="font-size:14px;font-weight:600;color:var(--ink)">Drop your NOS file here</div>
+        <div style="font-size:12px;color:#888;margin-top:4px">PDF, Word (.docx), or plain text — we'll extract the content automatically</div>
         <div id="file-name" style="margin-top:10px;font-size:12px;color:var(--green);font-weight:600"></div>
       </div>
-      <input type="file" id="file-input" accept=".txt,.text" style="display:none" onchange="handleFileUpload(event)"/>
+      <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt,.text,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="handleFileUpload(event)"/>
     </div>
 
     <div style="display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap">
@@ -471,170 +363,7 @@ p.body-text{margin-bottom:10px;font-size:13px;line-height:1.7}
 </div><!-- /screen-app -->
 
 <script>
-// ══════════════════════════════════════════════════
-// CONFIGURATION — replace with your actual values
-// ══════════════════════════════════════════════════
-const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
-const FLW_PUBLIC_KEY = 'YOUR_FLUTTERWAVE_PUBLIC_KEY';
 
-// Pricing in Naira (kobo for Flutterwave = Naira * 100)
-const PLANS = {
-  monthly:  { label:'Monthly',  amount:3500,  days:31,  currency:'NGN' },
-  quarterly:{ label:'Quarterly',amount:9000,  days:92,  currency:'NGN' },
-  annual:   { label:'Annual',   amount:28000, days:365, currency:'NGN' }
-};
-
-// ── Init Supabase ──
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-let currentUser = null;
-let currentProfile = null;
-
-// ── Screen management ──
-function showScreen(name){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  const el = document.getElementById('screen-'+name);
-  if(el) el.classList.add('active');
-}
-
-function switchTab(tab){
-  document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',i===(tab==='login'?0:1)));
-  document.getElementById('form-login').style.display = tab==='login'?'block':'none';
-  document.getElementById('form-signup').style.display = tab==='signup'?'block':'none';
-}
-
-// ── Auth ──
-async function doLogin(){
-  const email = document.getElementById('login-email').value.trim();
-  const pass  = document.getElementById('login-password').value;
-  const msg   = document.getElementById('login-msg');
-  msg.className='auth-msg'; msg.textContent='Signing in...'; msg.style.display='block';
-  const {data,error} = await supabase.auth.signInWithPassword({email,password:pass});
-  if(error){ msg.className='auth-msg error'; msg.textContent=error.message; return; }
-  await afterLogin(data.user);
-}
-
-async function doSignup(){
-  const name  = document.getElementById('signup-name').value.trim();
-  const email = document.getElementById('signup-email').value.trim();
-  const pass  = document.getElementById('signup-password').value;
-  const org   = document.getElementById('signup-org').value.trim();
-  const msg   = document.getElementById('signup-msg');
-  if(!name||!email||!pass){ msg.className='auth-msg error'; msg.textContent='Please fill all fields.'; return; }
-  if(pass.length<8){ msg.className='auth-msg error'; msg.textContent='Password must be at least 8 characters.'; return; }
-  msg.className='auth-msg'; msg.textContent='Creating account...'; msg.style.display='block';
-  const {data,error} = await supabase.auth.signUp({email,password:pass,options:{data:{full_name:name,organisation:org}}});
-  if(error){ msg.className='auth-msg error'; msg.textContent=error.message; return; }
-  // Insert profile row
-  if(data.user){
-    await supabase.from('profiles').insert({id:data.user.id,full_name:name,email,organisation:org,subscription_status:'inactive'});
-  }
-  msg.className='auth-msg success'; msg.textContent='Account created! Check your email to confirm, then sign in.';
-}
-
-async function afterLogin(user){
-  currentUser = user;
-  // Fetch profile
-  const {data:profile} = await supabase.from('profiles').select('*').eq('id',user.id).single();
-  currentProfile = profile;
-  // Update nav
-  document.getElementById('nav-user-name').textContent = profile?.full_name || user.email;
-  document.getElementById('nav-user-name').style.display='inline';
-  document.getElementById('nav-logout-btn').style.display='inline';
-  // Check subscription
-  checkSubscription(profile);
-}
-
-function checkSubscription(profile){
-  if(!profile){ showScreen('sub'); return; }
-  const status = profile.subscription_status;
-  const expiry = profile.subscription_expiry ? new Date(profile.subscription_expiry) : null;
-  const now = new Date();
-  if(status==='active' && expiry && expiry > now){
-    showScreen('app');
-  } else if(status==='active' && expiry && expiry <= now){
-    document.getElementById('expired-msg').textContent = 'Your subscription expired on '+expiry.toLocaleDateString('en-NG');
-    showScreen('expired');
-  } else {
-    showScreen('sub');
-  }
-}
-
-async function logout(){
-  await supabase.auth.signOut();
-  currentUser=null; currentProfile=null;
-  document.getElementById('nav-user-name').style.display='none';
-  document.getElementById('nav-logout-btn').style.display='none';
-  showScreen('auth');
-}
-
-// ── Payment ──
-function startPayment(planKey){
-  if(!currentUser){ showScreen('auth'); return; }
-  const plan = PLANS[planKey];
-  FlutterwaveCheckout({
-    public_key: FLW_PUBLIC_KEY,
-    tx_ref: 'NSQ-'+Date.now(),
-    amount: plan.amount,
-    currency: plan.currency,
-    payment_options: 'card,banktransfer,ussd,mobilemoneyghana,mobilemoneyuganda',
-    customer: {
-      email: currentUser.email,
-      name: currentProfile?.full_name || currentUser.email,
-    },
-    customizations: {
-      title: 'NSQ Assessment Builder',
-      description: plan.label+' subscription',
-      logo: 'https://mustaphabadamasi.github.io/nsq-assessment-builder/logo.png'
-    },
-    callback: async function(response){
-      if(response.status==='successful'||response.status==='completed'){
-        // Activate subscription in Supabase
-        const expiry = new Date();
-        expiry.setDate(expiry.getDate()+plan.days);
-        await supabase.from('profiles').update({
-          subscription_status:'active',
-          subscription_plan: planKey,
-          subscription_expiry: expiry.toISOString(),
-          last_payment_ref: response.transaction_id
-        }).eq('id',currentUser.id);
-        // Refresh profile
-        const {data:updated} = await supabase.from('profiles').select('*').eq('id',currentUser.id).single();
-        currentProfile = updated;
-        alert('✅ Payment successful! Welcome to NSQ Assessment Builder.');
-        showScreen('app');
-      } else {
-        alert('Payment was not completed. Please try again.');
-      }
-    },
-    onclose: function(){ console.log('Payment closed'); }
-  });
-}
-
-// ── Auto-session restore ──
-supabase.auth.onAuthStateChange(async(event,session)=>{
-  if(session?.user){ await afterLogin(session.user); }
-});
-
-// ══════════════════════════════════════════════════
-// ASSESSMENT BUILDER ENGINE (full app logic below)
-// ══════════════════════════════════════════════════
-const SAMPLE_NOS = `LO 1: Apply health and safety regulations in hardware maintenance.
-1.1 Explain the key health and safety regulations relevant to hardware maintenance.
-1.2 Demonstrate the use of personal protective equipment (PPE) when handling computer components.
-1.3 Identify potential hazards in a computer hardware maintenance environment.
-
-LO 2: Diagnose faults in computer hardware components.
-2.1 Use diagnostic tools and software to identify hardware faults.
-2.2 Demonstrate systematic fault-finding techniques for common hardware failures.
-2.3 Document findings of the diagnostic process accurately.
-
-LO 3: Carry out maintenance and repair of computer hardware.
-3.1 Install and configure hardware components following manufacturer specifications.
-3.2 Perform preventive maintenance procedures on computer systems.
-3.3 Replace faulty components using appropriate tools and techniques.
-3.4 Test repaired systems to verify correct operation.`;
 
 // ── Multi-unit state ──
 let allDetectedUnits = []; // [{unitNum, unitRef, unitTitle, rawText, los:[]}]
@@ -658,13 +387,71 @@ function handleDrop(e){
 }
 function handleFileUpload(e){ const f=e.target.files[0]; if(f) readFile(f); }
 function readFile(file){
-  const r=new FileReader();
-  r.onload=ev=>{
-    document.getElementById('nos-input').value=ev.target.result;
-    document.getElementById('file-name').textContent='✓ Loaded: '+file.name;
-    detectUnits();
-  };
-  r.readAsText(file);
+  const name = file.name.toLowerCase();
+  const statusEl = document.getElementById('file-name');
+  statusEl.textContent = '⏳ Reading: ' + file.name + '...';
+  statusEl.style.color = '#856404';
+
+  if(name.endsWith('.pdf')){
+    const reader = new FileReader();
+    reader.onerror = function(){ statusEl.textContent = '✗ Failed to read file'; statusEl.style.color = '#c0392b'; };
+    reader.onload = async function(ev){
+      try{
+        const typedArray = new Uint8Array(ev.target.result);
+        const pdf = await pdfjsLib.getDocument({data: typedArray}).promise;
+        let text = '';
+        for(let i = 1; i <= pdf.numPages; i++){
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          const pageText = content.items.map(function(item){
+            return item.str;
+          }).join(' ');
+          text += pageText + '\n\n';
+        }
+        document.getElementById('nos-input').value = text.trim();
+        statusEl.textContent = '✓ Loaded: ' + file.name + ' (' + pdf.numPages + ' pages)';
+        statusEl.style.color = 'var(--green)';
+        setMode('paste');
+        detectUnits();
+      }catch(err){
+        console.error('PDF error:', err);
+        statusEl.textContent = '✗ Could not read PDF. Try copy-pasting the text instead.';
+        statusEl.style.color = '#c0392b';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+
+  } else if(name.endsWith('.docx')){
+    const reader = new FileReader();
+    reader.onerror = function(){ statusEl.textContent = '✗ Failed to read file'; statusEl.style.color = '#c0392b'; };
+    reader.onload = async function(ev){
+      try{
+        const result = await mammoth.extractRawText({arrayBuffer: ev.target.result});
+        document.getElementById('nos-input').value = result.value.trim();
+        statusEl.textContent = '✓ Loaded: ' + file.name;
+        statusEl.style.color = 'var(--green)';
+        setMode('paste');
+        detectUnits();
+      }catch(err){
+        console.error('DOCX error:', err);
+        statusEl.textContent = '✗ Could not read Word file. Try copy-pasting the text instead.';
+        statusEl.style.color = '#c0392b';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+
+  } else {
+    const reader = new FileReader();
+    reader.onerror = function(){ statusEl.textContent = '✗ Failed to read file'; statusEl.style.color = '#c0392b'; };
+    reader.onload = function(ev){
+      document.getElementById('nos-input').value = ev.target.result.trim();
+      statusEl.textContent = '✓ Loaded: ' + file.name;
+      statusEl.style.color = 'var(--green)';
+      setMode('paste');
+      detectUnits();
+    };
+    reader.readAsText(file);
+  }
 }
 
 // ── Parse full document into units ──
