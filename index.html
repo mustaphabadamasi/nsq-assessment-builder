@@ -403,10 +403,22 @@ function readFile(file){
         for(let i = 1; i <= pdf.numPages; i++){
           const page = await pdf.getPage(i);
           const content = await page.getTextContent();
-          const pageText = content.items.map(function(item){
-            return item.str;
-          }).join(' ');
-          text += pageText + '\n\n';
+          // Preserve line breaks by checking y-position changes
+          let lastY = null;
+          let line = '';
+          for(let j = 0; j < content.items.length; j++){
+            const item = content.items[j];
+            if(item.str.trim() === '') continue;
+            const y = Math.round(item.transform[5]);
+            if(lastY !== null && Math.abs(y - lastY) > 3){
+              text += line.trim() + '\n';
+              line = '';
+            }
+            line += item.str + ' ';
+            lastY = y;
+          }
+          if(line.trim()) text += line.trim() + '\n';
+          text += '\n';
         }
         document.getElementById('nos-input').value = text.trim();
         statusEl.textContent = '✓ Loaded: ' + file.name + ' (' + pdf.numPages + ' pages)';
@@ -463,48 +475,66 @@ function parseFullDocument(raw){
 
   for(const line of lines){
     if(!line) continue;
-    // Unit header: "Unit 001:", "Unit 001 –", "UNIT 1:", "001 Health and Safety"
-    const unitM = line.match(/^(?:Unit\s+)?(\d{1,3})\s*[:\-–]\s*(.+)/i) ||
-                  line.match(/^Unit\s+(\w+)[:\s]+(.+)/i);
-    if(unitM && !line.match(/^\d+\.\d+/)){ // not a PC ref
-      // Only treat as new unit if it looks like a unit header (not a PC)
-      const possibleUnit = unitM[1].trim();
-      const possibleTitle = unitM[2].trim();
-      // Heuristic: unit headers don't start with LO numbers
-      if(!line.match(/^LO\s*\d/i) && !line.match(/^\d+\.\d+/)){
-        curUnit = {unitNum:possibleUnit, unitRef:'', unitTitle:possibleTitle, rawText:'', los:[]};
-        units.push(curUnit);
-        curLO = null;
-        continue;
-      }
-    }
-    // LO header
-    const loM = line.match(/^LO\s*(\d+)\s*[:\-–]\s*(.+)/i);
-    if(loM){
-      if(!curUnit){
-        curUnit={unitNum:'1',unitRef:'',unitTitle:'Unit 1',rawText:'',los:[]};
-        units.push(curUnit);
-      }
-      curLO={num:loM[1],title:loM[2].trim(),pcs:[]};
-      curUnit.los.push(curLO);
-      if(curUnit.rawText) curUnit.rawText+='\n';
-      curUnit.rawText+=line;
+
+    // Unit header patterns:
+    // "Unit 001: Title", "UNIT 1: Title", "Unit 4: Social Media Platforms"
+    const unitM = line.match(/^Unit\s+(\d{1,3})\s*[:\-–]\s*(.+)/i);
+    if(unitM && !line.match(/^\d+\.\d+/)){
+      curUnit = {unitNum:unitM[1].replace(/^0+/,''), unitRef:'', unitTitle:unitM[2].trim(), rawText:'', los:[]};
+      units.push(curUnit);
+      curLO = null;
       continue;
     }
-    // PC
-    const pcM = line.match(/^(\d+)\.(\d+)\s+(.+)/);
-    if(pcM && curLO){
-      curLO.pcs.push({ref:`${pcM[1]}.${pcM[2]}`,text:pcM[3].trim()});
+
+    // LO header patterns:
+    // "LO 1: Title", "LO 1 Title", "LO1: Title"
+    // "Learning Outcome 1:", "LEARNING OBJECTIVE (LO) 1:"
+    const loM = line.match(/^(?:LO|Learning\s+(?:Outcome|Objective)\s*(?:\(LO\))?)\s*(\d+)\s*[:\-–]\s*(.+)/i) ||
+                line.match(/^LO\s*(\d+)\s*[:\-–]?\s*$/i);
+    if(loM){
+      if(!curUnit){
+        curUnit={unitNum:String(units.length+1),unitRef:'',unitTitle:'Unit '+String(units.length+1),rawText:'',los:[]};
+        units.push(curUnit);
+      }
+      const loTitle = loM[2] ? loM[2].trim() : '';
+      curLO={num:loM[1],title:loTitle,pcs:[]};
+      curUnit.los.push(curLO);
       curUnit.rawText+='\n'+line;
       continue;
     }
+
+    // LO title on next line (if previous line was just "LO 1:")
+    if(curLO && !curLO.title && line && !line.match(/^\d+\.\d+/)){
+      curLO.title = line;
+      curUnit.rawText+='\n'+line;
+      continue;
+    }
+
+    // PC patterns: "1.1 text", "1.1. text", "1.1 – text"
+    const pcM = line.match(/^(\d+)\.(\d+)\.?\s*[–\-]?\s*(.+)/);
+    if(pcM){
+      if(!curLO && curUnit){
+        // Auto-create LO from the PC major number
+        curLO={num:pcM[1],title:'',pcs:[]};
+        curUnit.los.push(curLO);
+      }
+      if(!curUnit){
+        curUnit={unitNum:'1',unitRef:'',unitTitle:'Unit 1',rawText:'',los:[]};
+        units.push(curUnit);
+        curLO={num:pcM[1],title:'',pcs:[]};
+        curUnit.los.push(curLO);
+      }
+      if(curLO) curLO.pcs.push({ref:pcM[1]+'.'+pcM[2],text:pcM[3].trim()});
+      if(curUnit) curUnit.rawText+='\n'+line;
+      continue;
+    }
+
     // Unit ref line e.g. "Ref: ICT/CMR/001/L2"
     const refM = line.match(/Ref[:\s]+([A-Z0-9\/\-]+)/i);
     if(refM && curUnit) curUnit.unitRef = refM[1];
 
     if(curUnit) curUnit.rawText+='\n'+line;
   }
-  // Filter: only keep units that have at least one LO
   return units.filter(u=>u.los.length>0);
 }
 
@@ -512,10 +542,16 @@ function parseNOS(raw){
   const lines=raw.split('\n').map(l=>l.trim()).filter(Boolean);
   const los=[];let cur=null;
   for(const line of lines){
-    const loM=line.match(/^LO\s*(\d+)\s*[:\-–]\s*(.+)/i);
-    if(loM){cur={num:loM[1],title:loM[2].trim(),pcs:[]};los.push(cur);continue;}
-    const pcM=line.match(/^(\d+)\.(\d+)\s+(.+)/);
-    if(pcM&&cur){cur.pcs.push({ref:`${pcM[1]}.${pcM[2]}`,text:pcM[3].trim()});}
+    const loM=line.match(/^(?:LO|Learning\s+(?:Outcome|Objective)\s*(?:\(LO\))?)\s*(\d+)\s*[:\-–]\s*(.+)/i) ||
+              line.match(/^LO\s*(\d+)\s*[:\-–]?\s*$/i);
+    if(loM){cur={num:loM[1],title:(loM[2]||'').trim(),pcs:[]};los.push(cur);continue;}
+    // LO title on next line
+    if(cur && !cur.title && line && !line.match(/^\d+\.\d+/)){cur.title=line;continue;}
+    const pcM=line.match(/^(\d+)\.(\d+)\.?\s*[–\-]?\s*(.+)/);
+    if(pcM){
+      if(!cur){cur={num:pcM[1],title:'',pcs:[]};los.push(cur);}
+      cur.pcs.push({ref:pcM[1]+'.'+pcM[2],text:pcM[3].trim()});
+    }
   }
   return los;
 }
