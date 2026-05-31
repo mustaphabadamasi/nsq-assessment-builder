@@ -347,11 +347,51 @@ p.body-text{margin-bottom:10px;font-size:13px;line-height:1.7}
     <label class="doc-item"><input type="checkbox" id="chk-decl" checked/><span>✅ Competence Declaration</span></label>
   </div>
   <div class="generate-bar">
-    <button class="btn-generate" onclick="generate()">⚡ Generate Assessment Pack</button>
+    <button class="btn-generate" id="gen-btn" onclick="generate()">⚡ Generate Assessment Pack</button>
     <button class="btn-sample" onclick="loadSample()">Load sample NOS</button>
+    <!-- AI Toggle -->
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 16px;border:1.5px solid var(--gold);border-radius:10px;background:var(--gold-light);user-select:none">
+      <input type="checkbox" id="ai-toggle" style="accent-color:var(--green);width:16px;height:16px" onchange="toggleAI()"/>
+      <span style="font-size:13px;font-weight:600;color:#856404">✨ AI-Enhanced Narratives</span>
+    </label>
     <span id="gen-status" style="font-size:13px;color:#666"></span>
   </div>
 </div>
+
+<!-- AI KEY SETTINGS -->
+<div id="ai-settings" style="display:none;margin-top:16px;background:var(--gold-light);border:1.5px solid var(--gold);border-radius:var(--radius);padding:20px 24px">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+    <span style="font-size:18px">✨</span>
+    <div>
+      <div style="font-weight:700;font-size:14px;color:#856404">AI-Enhanced Narratives</div>
+      <div style="font-size:12px;color:#a07000">Claude AI will write unique, personalised narratives for each student's DO, PS, WT and Q&A documents</div>
+    </div>
+  </div>
+  <label style="font-size:12px;font-weight:600;color:#856404;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Anthropic API Key</label>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <input type="password" id="ai-key-input" placeholder="sk-ant-api03-..." style="flex:1;min-width:240px;padding:10px 14px;border:1.5px solid #e0c870;border-radius:8px;font-size:13px;font-family:monospace;background:#fff"/>
+    <button onclick="saveApiKey()" style="padding:10px 18px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;font-family:var(--font-body);cursor:pointer">Save Key</button>
+  </div>
+  <div id="ai-key-status" style="font-size:12px;margin-top:8px;color:#856404"></div>
+  <div style="font-size:11px;color:#a07000;margin-top:10px;line-height:1.6">
+    🔒 Your key is stored only in your browser and never sent anywhere except directly to Anthropic's API.<br/>
+    📌 Get a free key at <strong>console.anthropic.com</strong> → API Keys → Create Key
+  </div>
+</div>
+
+<!-- AI LOADING OVERLAY -->
+<div id="ai-loading" style="display:none;margin-top:20px;background:#fff;border:1.5px solid var(--gold);border-radius:var(--radius);padding:32px;text-align:center">
+  <div style="font-size:32px;margin-bottom:12px;animation:spin 2s linear infinite;display:inline-block">✨</div>
+  <div style="font-weight:700;font-size:15px;color:var(--ink);margin-bottom:6px" id="ai-status-text">Claude is writing personalised narratives...</div>
+  <div style="font-size:13px;color:#666" id="ai-status-sub">This takes 10–20 seconds for a full pack</div>
+  <div style="margin-top:16px;background:var(--border);border-radius:20px;height:6px;overflow:hidden">
+    <div id="ai-progress-bar" style="background:linear-gradient(90deg,var(--green),var(--gold));height:100%;width:0%;transition:width .5s;border-radius:20px"></div>
+  </div>
+</div>
+
+<style>
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+</style>
 
 <!-- OUTPUT -->
 <div class="output-section" id="output-section">
@@ -581,6 +621,13 @@ function detectUnits(){
   st.textContent=`✓ Found ${allDetectedUnits.length} unit${allDetectedUnits.length>1?'s':''} · ${totalLOs} Learning Outcomes · ${totalPCs} Performance Criteria. Select up to 3 units below.`;
 }
 
+// ── Generic vs Practical unit classification ──
+const GENERIC_KEYWORDS = ['health and safety','occupational health','communication','teamwork','team work','team building','workplace safety','ohs','hse','interpersonal','soft skill'];
+function isGenericUnit(unit){
+  const t = (unit.unitTitle||'').toLowerCase();
+  return GENERIC_KEYWORDS.some(kw=>t.includes(kw));
+}
+
 function renderUnitSelector(){
   const container = document.getElementById('unit-cards');
   container.innerHTML = '';
@@ -588,20 +635,24 @@ function renderUnitSelector(){
     const isSelected = selectedUnitKeys.includes(idx);
     const isDisabled = !isSelected && selectedUnitKeys.length >= 3;
     const totalPCs = unit.los.reduce((n,l)=>n+l.pcs.length,0);
+    const generic = isGenericUnit(unit);
+    const typeBadge = generic
+      ? '<span style="background:#fdf6e3;color:#856404;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:6px;border:1px solid #f0d78c">GENERIC</span>'
+      : '<span style="background:var(--green-light);color:var(--green);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:6px;border:1px solid #a8d5b5">PRACTICAL</span>';
     const card = document.createElement('div');
     card.className = 'unit-card'+(isSelected?' selected':'')+(isDisabled?' disabled':'');
     card.id = 'unit-card-'+idx;
     card.innerHTML=`<input type="checkbox" class="unit-cb" id="ucb-${idx}" ${isSelected?'checked':''} ${isDisabled?'disabled':''} onchange="toggleUnit(${idx},this.checked)" onclick="event.stopPropagation()"/>
       <div class="unit-card-body">
-        <div class="unit-card-title">Unit ${unit.unitNum}: ${unit.unitTitle}</div>
+        <div class="unit-card-title">Unit ${unit.unitNum}: ${unit.unitTitle} ${typeBadge}</div>
         <div class="unit-card-meta">${unit.los.length} Learning Outcome${unit.los.length>1?'s':''} · ${totalPCs} Performance Criteria${unit.unitRef?' · Ref: '+unit.unitRef:''}</div>
+        ${generic?'<div style="font-size:11px;color:#856404;margin-top:4px;font-style:italic">⚠ Generic unit — PCs will be cross-referenced holistically in practical unit DO reports</div>':''}
       </div>
       ${isSelected?'<span style="background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0">✓ Selected</span>':''}`;
     card.onclick = ()=>{ if(!isDisabled){ const cb=document.getElementById('ucb-'+idx); cb.checked=!cb.checked; toggleUnit(idx,cb.checked); } };
     container.appendChild(card);
   });
   document.getElementById('unit-sel-count').textContent=`${selectedUnitKeys.length} / 3 selected`;
-  // colour counter
   const counter=document.getElementById('unit-sel-count');
   counter.style.background = selectedUnitKeys.length===3?'#fdf6e3':selectedUnitKeys.length>0?'var(--green-light)':'var(--green-light)';
   counter.style.color = selectedUnitKeys.length===3?'#856404':'var(--green)';
@@ -782,13 +833,38 @@ function buildPRF(c,los){
   );
 }
 
-function buildDO(c,los){
+function buildDO(c,los,genericUnits){
   let rows='';
   for(const lo of los){
     rows+=`<tr><td colspan="3" class="lo-head" style="background:#f0f7f1;font-weight:700">LO ${lo.num}: ${lo.title}</td></tr>`;
     for(const pc of lo.pcs){
       rows+=`<tr><td style="width:8%;font-weight:700">${pc.ref}</td><td style="width:52%">${pc.text}</td><td>${verbNarrative(pc,'assessor')}</td></tr>`;
     }
+  }
+  // Holistic cross-referencing of generic units
+  let holisticSection = '';
+  if(genericUnits && genericUnits.length > 0){
+    let holisticRows = '';
+    const crossRefPCs = [];
+    genericUnits.forEach(gu=>{
+      holisticRows += `<tr><td colspan="3" class="lo-head" style="background:#fdf6e3;font-weight:700;border-left-color:#c9a84c">Unit ${gu.unitNum}: ${gu.unitTitle} <span style="font-size:10px;font-weight:400;color:#856404">(Generic — observed holistically)</span></td></tr>`;
+      gu.los.forEach(lo=>{
+        lo.pcs.forEach(pc=>{
+          crossRefPCs.push(pc.ref);
+          const t = pc.text.replace(/^(\w+)\s*/,'').replace(/\.$/,'').trim();
+          holisticRows += `<tr><td style="width:8%;font-weight:700;color:#856404">${pc.ref}</td><td style="width:52%">${pc.text}</td><td style="color:#555">During the practical observation, the learner demonstrated ${t} as an integral part of carrying out the tasks. This was observed naturally within the context of the practical activity.</td></tr>`;
+        });
+      });
+    });
+    const genericNames = genericUnits.map(g=>'Unit '+g.unitNum+': '+g.unitTitle).join('; ');
+    const crossRefs = crossRefPCs.join(', ');
+    holisticSection = `
+    <div class="section-head">Holistic Cross-Referencing — Generic Units</div>
+    <p class="body-text">The following generic unit performance criteria were observed holistically during this practical assessment. These criteria — from ${genericNames} — cannot be directly observed in isolation but were naturally demonstrated by ${c.candidate} while carrying out the practical tasks above. The PCs cross-referenced are: ${crossRefs}.</p>
+    <table class="evidence-table">
+      <tr><th style="width:8%">PC Ref.</th><th style="width:42%">Performance Criterion</th><th>Holistic Observation</th></tr>
+      ${holisticRows}
+    </table>`;
   }
   return sheetWrap("CANDIDATE'S PERFORMANCE EVIDENCE RECORD FORM","Direct Observation (DO) — Ref: ARF 03A",
     `<table class="info-table">
@@ -804,6 +880,7 @@ function buildDO(c,los){
       ${rows}
     </table>
     <p class="body-text">At the conclusion of the observation, I provided feedback to ${c.candidate} on their performance. The learner demonstrated competence against all the performance criteria observed during this session.</p>
+    ${holisticSection}
     ${sigBlock()}`
   );
 }
@@ -1038,7 +1115,16 @@ function generate(){
   const c = ctx();
   const generated = {}; // key → html string
 
-  // For each selected unit, generate all chosen document types
+  // Separate generic and practical units
+  const genericUnits = unitsToProcess.filter(u=>isGenericUnit(u));
+  const practicalUnits = unitsToProcess.filter(u=>!isGenericUnit(u));
+
+  // Warn if only generic units selected and DO is checked
+  if(practicalUnits.length===0 && document.getElementById('chk-do')?.checked){
+    alert('Note: All selected units are generic (Health & Safety, Communication, Teamwork). Direct Observation reports require at least one practical unit. Generic unit PCs will be generated for other document types only.');
+  }
+
+  // For each selected unit, generate documents
   unitsToProcess.forEach((unit,ui)=>{
     const uc = {...c,
       unitNum: unit.unitNum||c.unitNum,
@@ -1047,12 +1133,22 @@ function generate(){
     };
     const prefix = unitsToProcess.length>1 ? `u${ui}_` : '';
     const los = unit.los;
+    const unitIsGeneric = isGenericUnit(unit);
 
     for(const key of ORDER){
       const b = BUILDERS[key];
-      if(document.getElementById(b.chk)?.checked){
-        const docKey = prefix+key;
-        generated[docKey] = {html: b.fn(uc,los), label: unitsToProcess.length>1?`Unit ${unit.unitNum} — ${b.label}`:b.label, unitIdx:ui, docType:key};
+      if(!document.getElementById(b.chk)?.checked) continue;
+
+      // Skip DO for generic units — their PCs go into practical unit DOs
+      if(key === 'do' && unitIsGeneric) continue;
+
+      const docKey = prefix+key;
+
+      // For DO on practical units, pass generic units for holistic cross-referencing
+      if(key === 'do' && !unitIsGeneric){
+        generated[docKey] = {html: buildDO(uc, los, genericUnits), label: unitsToProcess.length>1?`Unit ${unit.unitNum} — ${b.label}`:b.label, unitIdx:ui, docType:key};
+      } else {
+        generated[docKey] = {html: b.fn(uc, los), label: unitsToProcess.length>1?`Unit ${unit.unitNum} — ${b.label}`:b.label, unitIdx:ui, docType:key};
       }
     }
   });
@@ -1073,7 +1169,12 @@ function generate(){
   const out=document.getElementById('output-section');
   out.classList.add('active');
   out.scrollIntoView({behavior:'smooth',block:'start'});
-  document.getElementById('gen-status').textContent=`✓ ${unitsToProcess.length} unit${unitsToProcess.length>1?'s':''} · ${Object.keys(generated).length} documents generated`;
+
+  // Status message
+  const genInfo = [];
+  if(practicalUnits.length) genInfo.push(practicalUnits.length+' practical');
+  if(genericUnits.length) genInfo.push(genericUnits.length+' generic (holistically cross-referenced in DO)');
+  document.getElementById('gen-status').textContent=`✓ ${unitsToProcess.length} unit${unitsToProcess.length>1?'s':''} (${genInfo.join(', ')}) · ${Object.keys(generated).length} documents generated`;
 }
 
 function renderSingleUnitOutput(generated){
@@ -1235,6 +1336,331 @@ function downloadDoc(panelId,label){
   a.download=`NSQ_${label.replace(/[^a-z0-9]/gi,'_')}.doc`;
   a.click();
 }
+
+// ══════════════════════════════════════════════════
+// AI NARRATIVE ENGINE
+// ══════════════════════════════════════════════════
+
+function toggleAI(){
+  const on = document.getElementById('ai-toggle').checked;
+  document.getElementById('ai-settings').style.display = on ? 'block' : 'none';
+  if(on && !localStorage.getItem('qaa_api_key')){
+    document.getElementById('ai-key-status').textContent = '⚠ Please enter your Anthropic API key above to use AI narratives.';
+  }
+}
+
+function saveApiKey(){
+  const key = document.getElementById('ai-key-input').value.trim();
+  if(!key.startsWith('sk-ant-')){ document.getElementById('ai-key-status').textContent = '✗ Invalid key format. Should start with sk-ant-...'; return; }
+  localStorage.setItem('qaa_api_key', key);
+  document.getElementById('ai-key-status').textContent = '✓ API key saved to your browser.';
+  document.getElementById('ai-key-input').value = '••••••••••••••••••••';
+}
+
+function getApiKey(){ return localStorage.getItem('qaa_api_key') || ''; }
+
+function aiEnabled(){ return document.getElementById('ai-toggle')?.checked && !!getApiKey(); }
+
+function setProgress(pct, text, sub){
+  document.getElementById('ai-progress-bar').style.width = pct+'%';
+  if(text) document.getElementById('ai-status-text').textContent = text;
+  if(sub) document.getElementById('ai-status-sub').textContent = sub;
+}
+
+// Call Anthropic API — returns parsed JSON or throws
+async function callClaude(prompt, systemPrompt){
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': getApiKey(),
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  if(!resp.ok){
+    const err = await resp.json().catch(()=>({}));
+    throw new Error(err?.error?.message || 'API error '+resp.status);
+  }
+  const data = await resp.json();
+  return data.content[0].text;
+}
+
+// Build PC list string for prompts
+function pcListStr(los){
+  return los.flatMap(lo=>lo.pcs.map(pc=>`${pc.ref}: ${pc.text}`)).join('\n');
+}
+
+// Generate all AI narratives for a unit — returns object of {pc_ref: {do,ps,wt,qa}}
+async function generateAINarratives(c, los, genericUnits){
+  const allPCs = los.flatMap(lo=>lo.pcs);
+  const genericPCs = (genericUnits||[]).flatMap(gu=>gu.los.flatMap(lo=>lo.pcs));
+
+  const system = `You are an expert NBTE/NSQ Quality Assurance Assessor (QAA) writing NSQ assessment evidence documents for Nigerian vocational qualifications. You write authentic, specific, varied narratives. Each candidate gets completely unique language even when performing the same tasks. Never use repetitive or generic phrases. Write naturally as an experienced assessor would.`;
+
+  const pcDescriptions = allPCs.map(pc=>`${pc.ref}: ${pc.text}`).join('\n');
+  const genericDescriptions = genericPCs.length ? '\nGeneric unit PCs (observed holistically):\n'+genericPCs.map(pc=>`${pc.ref}: ${pc.text}`).join('\n') : '';
+
+  const prompt = `Generate unique, personalised assessment narratives for this candidate:
+
+CANDIDATE: ${c.candidate}
+TRADE: ${c.trade} — NSQ Level ${c.level}
+UNIT: Unit ${c.unitNum}: ${c.unitTitle}
+DATE: ${c.date}
+TIME: ${c.time}
+VENUE: ${c.venue}
+ASSESSOR: ${c.assessor}
+WITNESS: ${c.witness}
+
+PERFORMANCE CRITERIA:
+${pcDescriptions}
+${genericDescriptions}
+
+For EACH performance criterion, write FOUR unique narratives:
+1. DO (Direct Observation) — Assessor's past-tense, first-person observation of the candidate performing this PC. Start with varied phrases ("I observed...", "During the session...", "The learner proceeded to...", etc.). 2-3 specific sentences. Include realistic details about what was actually seen.
+2. PS (Personal Statement) — Candidate's first-person reflective account of performing this PC. Start with varied phrases ("During my assessment...", "I demonstrated...", "As part of my practical work...", etc.). 2-3 sentences.
+3. WT (Witness Testimony) — Third-person witness statement confirming the candidate's competence. Start with varied phrases ("The candidate demonstrated...", "I observed ${c.candidate}...", "Throughout the activity...", etc.). 2-3 sentences.
+4. QA (Question & Answer) — A model answer the candidate would give when questioned on this PC. Natural, conversational, specific to the trade. 3-4 sentences.
+
+Also write:
+- DO_OPENING: A unique opening paragraph for the DO report narrative (3-4 sentences, first-person assessor voice, describing arriving at the venue, setting up the assessment, the candidate's demeanour and initial preparation).
+- PS_OPENING: A unique opening paragraph for the personal statement (3-4 sentences, first-person candidate voice, describing preparing for the assessment and their feelings/approach).
+- WT_OPENING: A unique opening paragraph for the witness testimony (2-3 sentences, describing witnessing the assessment).
+
+Return ONLY valid JSON in this exact format (no markdown, no explanation):
+{
+  "do_opening": "...",
+  "ps_opening": "...",
+  "wt_opening": "...",
+  "pcs": {
+    "1.1": {"do": "...", "ps": "...", "wt": "...", "qa": "..."},
+    "1.2": {"do": "...", "ps": "...", "wt": "...", "qa": "..."}
+  }
+}`;
+
+  const raw = await callClaude(prompt, system);
+  // Strip any markdown code fences
+  const clean = raw.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+  return JSON.parse(clean);
+}
+
+// AI-powered document builders
+function buildDO_AI(c, los, genericUnits, ai){
+  let rows='';
+  for(const lo of los){
+    rows+=`<tr><td colspan="3" class="lo-head" style="background:#f0f7f1;font-weight:700">LO ${lo.num}: ${lo.title}</td></tr>`;
+    for(const pc of lo.pcs){
+      const narrative = ai?.pcs?.[pc.ref]?.do || verbNarrative(pc,'assessor');
+      rows+=`<tr><td style="width:8%;font-weight:700">${pc.ref}</td><td style="width:52%">${pc.text}</td><td>${narrative}</td></tr>`;
+    }
+  }
+  let holisticSection='';
+  if(genericUnits&&genericUnits.length>0){
+    let holisticRows='';const crossRefPCs=[];
+    genericUnits.forEach(gu=>{
+      holisticRows+=`<tr><td colspan="3" class="lo-head" style="background:#fdf6e3;font-weight:700;border-left-color:#c9a84c">Unit ${gu.unitNum}: ${gu.unitTitle} <span style="font-size:10px;font-weight:400;color:#856404">(Generic — observed holistically)</span></td></tr>`;
+      gu.los.forEach(lo=>lo.pcs.forEach(pc=>{
+        crossRefPCs.push(pc.ref);
+        const narrative = ai?.pcs?.[pc.ref]?.do || `During the practical observation, the learner demonstrated ${pc.text.replace(/^(\w+)\s*/,'').replace(/\.$/,'').trim()} as an integral part of carrying out the tasks.`;
+        holisticRows+=`<tr><td style="width:8%;font-weight:700;color:#856404">${pc.ref}</td><td style="width:52%">${pc.text}</td><td style="color:#555">${narrative}</td></tr>`;
+      }));
+    });
+    const genericNames=genericUnits.map(g=>'Unit '+g.unitNum+': '+g.unitTitle).join('; ');
+    holisticSection=`<div class="section-head">Holistic Cross-Referencing — Generic Units</div>
+    <p class="body-text">The following generic unit performance criteria were observed holistically during this practical assessment from ${genericNames}. PCs cross-referenced: ${crossRefPCs.join(', ')}.</p>
+    <table class="evidence-table"><tr><th style="width:8%">PC Ref.</th><th style="width:42%">Performance Criterion</th><th>Holistic Observation</th></tr>${holisticRows}</table>`;
+  }
+  const opening = ai?.do_opening || `At about ${c.time} on ${c.date}, I arrived at ${c.venue}, ${c.centre}, to carry out a direct observation of my learner, ${c.candidate}, for Unit ${c.unitNum}: ${c.unitTitle} (${c.unitRef}). Before commencing the assessment, I explained the assessment plan to the learner, confirmed they understood the process, and obtained their agreement to proceed.`;
+  return sheetWrap("CANDIDATE'S PERFORMANCE EVIDENCE RECORD FORM","Direct Observation (DO) — Ref: ARF 03A",
+    `<table class="info-table">
+      <tr><td>Candidate</td><td>${c.candidate}</td><td>Trade/Level</td><td>${c.trade} — Level ${c.level}</td></tr>
+      <tr><td>Unit</td><td>Unit ${c.unitNum}: ${c.unitTitle}</td><td>Unit Ref.</td><td>${c.unitRef}</td></tr>
+      <tr><td>Date</td><td>${c.date}</td><td>Time</td><td>${c.time}</td></tr>
+      <tr><td>Venue</td><td>${c.venue}</td><td>Assessor</td><td>${c.assessor}</td></tr>
+    </table>
+    <div class="section-head">Assessor's Narrative Observation</div>
+    <p class="body-text">${opening}</p>
+    <table class="evidence-table">
+      <tr><th style="width:8%">PC Ref.</th><th style="width:42%">Performance Criterion</th><th>Assessor's Observation</th></tr>${rows}
+    </table>
+    <p class="body-text">At the conclusion of the observation, I provided feedback to ${c.candidate} on their performance. The learner demonstrated competence against all the performance criteria observed during this session.</p>
+    ${holisticSection}${sigBlock()}`);
+}
+
+function buildPS_AI(c, los, ai){
+  let body='';
+  for(const lo of los){
+    body+=`<div class="lo-group"><div class="lo-head">LO ${lo.num}: ${lo.title}</div>`;
+    for(const pc of lo.pcs){
+      const narrative = ai?.pcs?.[pc.ref]?.ps || verbNarrative(pc,'learner');
+      body+=`<div class="pc-row"><strong>${pc.ref}</strong> — ${narrative}</div>`;
+    }
+    body+=`</div>`;
+  }
+  const opening = ai?.ps_opening || `I, ${c.candidate}, hereby make this personal reflective statement as evidence of my competence for Unit ${c.unitNum}: ${c.unitTitle}. The following account describes what I did, how I did it, and what I learnt during my assessment on ${c.date} at ${c.venue}.`;
+  return sheetWrap('PERSONAL REFLECTIVE STATEMENT','Evidence Type: Personal Statement (PS) — Ref: ARF 04',
+    `<table class="info-table">
+      <tr><td>Candidate</td><td>${c.candidate}</td><td>Trade/Level</td><td>${c.trade} — Level ${c.level}</td></tr>
+      <tr><td>Unit</td><td>Unit ${c.unitNum}: ${c.unitTitle}</td><td>Date</td><td>${c.date}</td></tr>
+    </table>
+    <div class="section-head">My Reflective Account</div>
+    <p class="body-text">${opening}</p>${body}
+    <p class="body-text">I confirm that this personal reflective statement is my own work and is an accurate account of the activities I carried out during my assessment.</p>${sigBlock()}`);
+}
+
+function buildWT_AI(c, los, ai){
+  let rows='';
+  for(const lo of los){
+    for(const pc of lo.pcs){
+      const narrative = ai?.pcs?.[pc.ref]?.wt || verbNarrative(pc,'witness');
+      rows+=`<tr><td>${pc.ref}</td><td>${pc.text}</td><td>${narrative}</td><td>✓</td></tr>`;
+    }
+  }
+  const opening = ai?.wt_opening || `I, ${c.witness}, hereby confirm that I witnessed ${c.candidate} carry out the tasks listed below on ${c.date} at ${c.venue}. I can confirm the following performance against the stated criteria:`;
+  return sheetWrap('WITNESS TESTIMONY','Evidence Type: Witness Testimony (WT) — Ref: ARF 05',
+    `<table class="info-table">
+      <tr><td>Candidate</td><td>${c.candidate}</td><td>Trade/Level</td><td>${c.trade} — Level ${c.level}</td></tr>
+      <tr><td>Unit</td><td>Unit ${c.unitNum}: ${c.unitTitle}</td><td>Date</td><td>${c.date}</td></tr>
+      <tr><td>Witness</td><td>${c.witness}</td><td>Venue</td><td>${c.venue}</td></tr>
+    </table>
+    <div class="section-head">Witness Statement</div>
+    <p class="body-text">${opening}</p>
+    <table class="evidence-table">
+      <tr><th style="width:8%">PC Ref</th><th>Performance Criterion</th><th>Witness Observation</th><th style="width:6%">✓</th></tr>${rows}
+    </table>
+    <p class="body-text">I confirm that the candidate performed all the above tasks competently, safely, and to the standard expected of a qualified practitioner in this occupational area.</p>${sigBlock()}`);
+}
+
+function buildQA_AI(c, los, ai){
+  let body='';
+  for(const lo of los){
+    body+=`<div class="section-head">LO ${lo.num}: ${lo.title}</div>`;
+    for(const pc of lo.pcs){
+      const qa = buildQuestion(pc);
+      const modelAnswer = ai?.pcs?.[pc.ref]?.qa || qa.a;
+      body+=`<div class="qa-q">Q [${pc.ref}]: ${qa.q}</div><div class="qa-a"><strong>Model Answer:</strong> ${modelAnswer}</div>`;
+    }
+  }
+  return sheetWrap('QUESTION AND ANSWER RECORD','Evidence Type: Q&amp;A — Ref: ARF 06',
+    `<table class="info-table">
+      <tr><td>Candidate</td><td>${c.candidate}</td><td>Trade/Level</td><td>${c.trade} — Level ${c.level}</td></tr>
+      <tr><td>Unit</td><td>Unit ${c.unitNum}: ${c.unitTitle}</td><td>Date</td><td>${c.date}</td></tr>
+      <tr><td>Assessor</td><td colspan="3">${c.assessor}</td></tr>
+    </table>
+    <p class="body-text">The following questions were put to the candidate verbally. The candidate's responses were noted and compared against the model answers below.</p>${body}${sigBlock()}`);
+}
+
+// Override generate to support AI mode
+const _originalGenerate = generate;
+generate = async function(){
+  if(!aiEnabled()){ _originalGenerate(); return; }
+
+  // Validate NOS first
+  let unitsToProcess = [];
+  if(selectedUnitKeys.length > 0){
+    unitsToProcess = selectedUnitKeys.map(i=>allDetectedUnits[i]);
+  } else {
+    const raw = document.getElementById('nos-input').value;
+    const los = parseNOS(raw);
+    if(!los.length){ alert('Please paste a valid NOS and click "Detect Units" first.'); return; }
+    const c2 = ctx();
+    unitsToProcess = [{unitNum:c2.unitNum,unitRef:c2.unitRef,unitTitle:c2.unitTitle,rawText:raw,los}];
+  }
+  if(!unitsToProcess.length){ alert('Please select at least one unit.'); return; }
+
+  const c = ctx();
+  const genericUnits = unitsToProcess.filter(u=>isGenericUnit(u));
+  const practicalUnits = unitsToProcess.filter(u=>!isGenericUnit(u));
+
+  // Show loading
+  document.getElementById('ai-loading').style.display='block';
+  document.getElementById('gen-btn').disabled=true;
+  document.getElementById('output-section').classList.remove('active');
+
+  try {
+    const generated = {};
+    const doChecked = document.getElementById('chk-do')?.checked;
+    const psChecked = document.getElementById('chk-ps')?.checked;
+    const wtChecked = document.getElementById('chk-wt')?.checked;
+    const qaChecked = document.getElementById('chk-qa')?.checked;
+
+    for(let ui=0; ui<unitsToProcess.length; ui++){
+      const unit = unitsToProcess[ui];
+      const uc = {...c, unitNum:unit.unitNum||c.unitNum, unitRef:unit.unitRef||c.unitRef||`Unit${unit.unitNum}`, unitTitle:unit.unitTitle||c.unitTitle};
+      const los = unit.los;
+      const prefix = unitsToProcess.length>1 ? `u${ui}_` : '';
+      const unitIsGeneric = isGenericUnit(unit);
+      const pct = Math.round((ui/unitsToProcess.length)*70);
+
+      setProgress(pct, `✨ Writing AI narratives for Unit ${unit.unitNum}: ${unit.unitTitle}...`, `Unit ${ui+1} of ${unitsToProcess.length}`);
+
+      // Generate AI narratives for this unit
+      let ai = null;
+      if((doChecked&&!unitIsGeneric)||(psChecked)||(wtChecked)||(qaChecked)){
+        ai = await generateAINarratives(uc, los, unitIsGeneric ? [] : genericUnits);
+      }
+
+      // Build documents
+      for(const key of ORDER){
+        const b = BUILDERS[key];
+        if(!document.getElementById(b.chk)?.checked) continue;
+        if(key==='do' && unitIsGeneric) continue;
+        const docKey = prefix+key;
+        const lbl = unitsToProcess.length>1 ? `Unit ${unit.unitNum} — ${b.label}` : b.label;
+
+        let html;
+        if(key==='do')       html = buildDO_AI(uc, los, genericUnits, ai);
+        else if(key==='ps')  html = buildPS_AI(uc, los, ai);
+        else if(key==='wt')  html = buildWT_AI(uc, los, ai);
+        else if(key==='qa')  html = buildQA_AI(uc, los, ai);
+        else                 html = b.fn(uc, los);
+
+        generated[docKey] = {html, label:lbl, unitIdx:ui, docType:key};
+      }
+    }
+
+    setProgress(100, '✅ AI narratives complete!', 'Rendering your documents...');
+    await new Promise(r=>setTimeout(r,600));
+
+    // Render output
+    document.getElementById('ai-loading').style.display='none';
+    const tabBar=document.getElementById('tab-bar');
+    const panels=document.getElementById('doc-panels');
+    tabBar.innerHTML=''; panels.innerHTML='';
+    if(unitsToProcess.length>1) renderMultiUnitOutput(generated,unitsToProcess);
+    else renderSingleUnitOutput(generated);
+    const out=document.getElementById('output-section');
+    out.classList.add('active');
+    out.scrollIntoView({behavior:'smooth',block:'start'});
+    const genInfo=[];
+    if(practicalUnits.length) genInfo.push(practicalUnits.length+' practical');
+    if(genericUnits.length) genInfo.push(genericUnits.length+' generic');
+    document.getElementById('gen-status').textContent=`✨ AI-enhanced · ${unitsToProcess.length} unit${unitsToProcess.length>1?'s':''} (${genInfo.join(', ')}) · ${Object.keys(generated).length} documents`;
+
+  } catch(err) {
+    document.getElementById('ai-loading').style.display='none';
+    console.error('AI error:', err);
+    alert('AI generation failed: '+err.message+'\n\nFalling back to standard templates.');
+    _originalGenerate();
+  } finally {
+    document.getElementById('gen-btn').disabled=false;
+  }
+};
+
+// Load saved API key on startup
+window.addEventListener('DOMContentLoaded', function(){
+  const saved = localStorage.getItem('qaa_api_key');
+  if(saved){
+    document.getElementById('ai-key-status').textContent = '✓ API key loaded from browser storage.';
+    document.getElementById('ai-key-input').placeholder = '••••••••••••••• (key saved)';
+  }
+});
 </script>
 </body>
 </html>
